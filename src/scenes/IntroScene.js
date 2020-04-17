@@ -4,14 +4,15 @@ import Align from '../utils/align'
 const PLAYER_KEY = 'player'
 const TAXI_KEY = 'taxi'
 const TRUCK_KEY = 'truck'
+const MINI_TRUCK_KEY = 'mini-truck'
+const VAN_KEY = 'van'
 
 const LANES = [220, 360, 490, 600]
 let loop = 0
 export default class IntroScene extends Phaser.Scene {
   constructor() {
     super('intro')
-    this.taxis = []
-    this.trucks = []
+    this.cars = []
   }
 
   preload() {
@@ -19,10 +20,12 @@ export default class IntroScene extends Phaser.Scene {
     this.load.image(PLAYER_KEY, 'assets/images/entities/Car.png')
     this.load.image(TAXI_KEY, 'assets/images/entities/taxi.png')
     this.load.image(TRUCK_KEY, 'assets/images/entities/truck.png')
+    this.load.image(MINI_TRUCK_KEY, 'assets/images/entities/Mini_truck.png')
+    this.load.image(VAN_KEY, 'assets/images/entities/Mini_van.png')
   }
 
   playerHit(player, enemy) {
-    this.taxis = this.taxis.reduce((prev, current) => {
+    this.cars = this.cars.reduce((prev, current) => {
       console.log('current', current)
       if (current === enemy) {
         return prev
@@ -30,9 +33,35 @@ export default class IntroScene extends Phaser.Scene {
       prev.push(current)
       return prev
     }, [])
-    enemy.destroy()
+
+    const crash = this.tweens.add({
+      targets: enemy,
+      x: enemy.x + 150,
+      rotation: -100,
+      duration: 500,
+      ease: 'Linear',
+      repeat: 0,
+      onComplete: (t, targets, custom) => {
+        enemy.destroy()
+      },
+    })
+
     player.setVelocity(0, 0)
-    player.setX(player.x - 50)
+
+    player.tweening = true
+    player.rotation = 100
+    const tw = this.tweens.add({
+      targets: player,
+
+      x: player.x - 50,
+      rotation: -100,
+      duration: 500,
+      ease: 'Linear',
+      repeat: 0,
+      onComplete: (t, targets, custom) => {
+        player.tweening = false
+      },
+    })
   }
 
   create() {
@@ -45,34 +74,32 @@ export default class IntroScene extends Phaser.Scene {
     )
     Align.center(this.bg)
 
-    this.player = this.physics.add.sprite(595, 350, PLAYER_KEY)
+    this.player = this.physics.add.sprite(595, 550, PLAYER_KEY)
+
+    this.player.tweening = false
     this.player.setScale(0.7, 0.7)
-    this.player.setSize(34, 48, true)
 
     this.player.setCollideWorldBounds(true)
     this.cursors = this.input.keyboard.createCursorKeys()
   }
 
   addTaxi() {
-    const lane = Phaser.Math.Between(0, 3)
-    console.info('lane', lane)
-    const taxi = this.physics.add.sprite(LANES[lane], -200, TAXI_KEY)
-    taxi.setScale(0.7, 0.7)
-
-    this.physics.add.collider(this.player, taxi, this.playerHit, null, this)
-
-    this.taxis.push(taxi)
+    this.addVehicle(TAXI_KEY)
   }
 
   addTruck() {
+    this.addVehicle(TRUCK_KEY)
+  }
+
+  addVehicle(key = TAXI_KEY) {
     const lane = Phaser.Math.Between(0, 3)
     console.info('lane', lane)
-    const truck = this.physics.add.sprite(LANES[lane], -200, TRUCK_KEY)
-    truck.setScale(0.7, 0.7)
+    const car = this.physics.add.sprite(LANES[lane], -200, key)
+    car.setScale(0.7, 0.7)
 
-    this.physics.add.collider(this.player, truck, () => { }, null, this)
+    this.physics.add.collider(this.player, car, this.playerHit, null, this)
 
-    this.trucks.push(truck)
+    this.cars.push(car)
   }
 
   update() {
@@ -93,25 +120,19 @@ export default class IntroScene extends Phaser.Scene {
 
       this.addTruck()
     }
-    this.taxis.forEach(taxi => {
-      if (taxi && taxi.setVelocityY) {
+    if (loop > 0 && loop % 2200 === 0) {
+      this.addVehicle(VAN_KEY)
+    }
+    this.cars.forEach(car => {
+      if (car && car.setVelocityY) {
         try {
-          taxi.setVelocityY(50)
+          car.setVelocityY(50)
         } catch (err) {
           console.error(err)
         }
       }
     })
 
-    this.trucks.forEach(trucks => {
-      if (trucks && trucks.setVelocityY) {
-        try {
-          trucks.setVelocityY(50)
-        } catch (err) {
-          console.error(err)
-        }
-      }
-    })
     if (this.cursors.left.isDown || gamepad.left) {
       this.player.setVelocityX(-160)
       this.player.rotation = 100
@@ -120,7 +141,9 @@ export default class IntroScene extends Phaser.Scene {
       this.player.rotation = -100
     } else {
       this.player.setVelocityX(0)
-      this.player.rotation = 0
+      if (!this.player.tweening) {
+        this.player.rotation = 0
+      }
     }
     if (this.player.x < 595) {
       // this.player.setX(this.player.x + 5)
