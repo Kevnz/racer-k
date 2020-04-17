@@ -6,13 +6,24 @@ const TAXI_KEY = 'taxi'
 const TRUCK_KEY = 'truck'
 const MINI_TRUCK_KEY = 'mini-truck'
 const VAN_KEY = 'van'
+const BULLET_KEY = 'bullet'
+const MISSLE_KEY = 'missle'
+
+const HIT_POINTS = {
+  [TAXI_KEY]: 10,
+  [TRUCK_KEY]: 20,
+  [MINI_TRUCK_KEY]: 25,
+  [VAN_KEY]: 25,
+}
 
 const LANES = [220, 360, 490, 600]
 let loop = 0
+let lock = false
 export default class IntroScene extends Phaser.Scene {
   constructor() {
     super('intro')
-    this.cars = []
+    this.cars = undefined
+    lock = false
   }
 
   preload() {
@@ -22,18 +33,11 @@ export default class IntroScene extends Phaser.Scene {
     this.load.image(TRUCK_KEY, 'assets/images/entities/truck.png')
     this.load.image(MINI_TRUCK_KEY, 'assets/images/entities/Mini_truck.png')
     this.load.image(VAN_KEY, 'assets/images/entities/Mini_van.png')
+    this.load.image(BULLET_KEY, 'assets/images/entities/bullet.png')
+    this.load.image(MISSLE_KEY, 'assets/images/entities/rocket.png')
   }
 
   playerHit(player, enemy) {
-    this.cars = this.cars.reduce((prev, current) => {
-      console.log('current', current)
-      if (current === enemy) {
-        return prev
-      }
-      prev.push(current)
-      return prev
-    }, [])
-
     const crash = this.tweens.add({
       targets: enemy,
       x: enemy.x + 150,
@@ -64,7 +68,24 @@ export default class IntroScene extends Phaser.Scene {
     })
   }
 
+  carShot(bullet, car) {
+    bullet.destroy()
+    const crash = this.tweens.add({
+      targets: car,
+      x: car.x + 150,
+      rotation: -100,
+      duration: 500,
+      ease: 'Linear',
+      repeat: 0,
+      onComplete: (t, targets, custom) => {
+        car.destroy()
+      },
+    })
+  }
+
   create() {
+    this.cars = this.physics.add.group({ key: 'cars' })
+    this.bullets = this.physics.add.group({ key: 'bullets' })
     this.bg = this.add.tileSprite(
       0,
       0,
@@ -81,6 +102,15 @@ export default class IntroScene extends Phaser.Scene {
 
     this.player.setCollideWorldBounds(true)
     this.cursors = this.input.keyboard.createCursorKeys()
+
+    this.physics.add.collider(
+      this.player,
+      this.cars,
+      this.playerHit,
+      null,
+      this
+    )
+    this.physics.add.collider(this.bullets, this.cars, this.carShot, null, this)
   }
 
   addTaxi() {
@@ -97,16 +127,42 @@ export default class IntroScene extends Phaser.Scene {
     const car = this.physics.add.sprite(LANES[lane], -200, key)
     car.setScale(0.7, 0.7)
 
-    this.physics.add.collider(this.player, car, this.playerHit, null, this)
+    this.cars.add(car)
+  }
 
-    this.cars.push(car)
+  fireGun() {
+    console.info('fire gun locked', lock)
+    if (lock) {
+      console.info('the gun is locked')
+      return
+    }
+    lock = true
+    console.info('fire gun locked', lock)
+    const x = this.player.x
+    const y = this.player.y
+    const bulletLeft = this.physics.add.sprite(x + 15, y - 70, BULLET_KEY)
+    const bulletRight = this.physics.add.sprite(x - 15, y - 70, BULLET_KEY)
+    bulletRight.setCollideWorldBounds(true)
+    bulletLeft.setCollideWorldBounds(true)
+    this.bullets.addMultiple([bulletRight, bulletLeft])
+    bulletLeft.setVelocityY(-200)
+    bulletRight.setVelocityY(-200)
+    this.time.addEvent({
+      delay: 100,
+      callback: function () {
+        console.info('un locked')
+        lock = false
+      },
+      callbackScope: this,
+      loop: false,
+    })
   }
 
   update() {
     const pads = this.input.gamepad.gamepads
     const gamepad = pads[0] || {}
     if (loop % 100 === 0) {
-      console.info('loop', loop)
+      console.info('loop', this.cars.children)
 
       console.info('taxis', this.taxis)
     }
@@ -123,7 +179,8 @@ export default class IntroScene extends Phaser.Scene {
     if (loop > 0 && loop % 2200 === 0) {
       this.addVehicle(VAN_KEY)
     }
-    this.cars.forEach(car => {
+
+    this.cars.getChildren().forEach(car => {
       if (car && car.setVelocityY) {
         try {
           car.setVelocityY(50)
@@ -155,6 +212,11 @@ export default class IntroScene extends Phaser.Scene {
       this.bg.tilePositionY = this.bg.tilePositionY - 8
     } else {
       this.bg.tilePositionY = this.bg.tilePositionY - 5
+    }
+    if (gamepad.A && !lock) {
+      console.info('this locked', lock)
+      // this.locked = true
+      this.fireGun()
     }
   }
 }
