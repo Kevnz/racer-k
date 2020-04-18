@@ -70,17 +70,20 @@ export default class IntroScene extends Phaser.Scene {
 
   carShot(bullet, car) {
     bullet.destroy()
-    const crash = this.tweens.add({
-      targets: car,
-      x: car.x + 150,
-      rotation: -100,
-      duration: 500,
-      ease: 'Linear',
-      repeat: 0,
-      onComplete: (t, targets, custom) => {
-        car.destroy()
-      },
-    })
+    car.hp = car.hp - 1
+    if (car.hp === 0) {
+      const crash = this.tweens.add({
+        targets: car,
+        x: car.x + 150,
+        rotation: -100,
+        duration: 500,
+        ease: 'Linear',
+        repeat: 0,
+        onComplete: (t, targets, custom) => {
+          car.destroy()
+        },
+      })
+    }
   }
 
   create() {
@@ -126,6 +129,8 @@ export default class IntroScene extends Phaser.Scene {
     console.info('lane', lane)
     const car = this.physics.add.sprite(LANES[lane], -200, key)
     car.setScale(0.7, 0.7)
+
+    car.hp = HIT_POINTS[key]
 
     this.cars.add(car)
   }
